@@ -108,6 +108,8 @@
 #     end
 #   end
 #
+require 'active_model/datastore/namespace'
+
 module ActiveModel::Datastore
   extend ActiveSupport::Concern
   include ActiveModel::Model
@@ -122,7 +124,7 @@ module ActiveModel::Datastore
   included do
     private_class_method :query_options, :query_sort, :query_property_filter, :find_all_entities
     define_model_callbacks :save, :update, :destroy
-    attr_accessor :id, :parent_key_id, :entity_property_values, :namespace
+    attr_accessor :id, :parent_key_id, :entity_property_values
   end
 
   def entity_properties
@@ -141,6 +143,14 @@ module ActiveModel::Datastore
   #
   def persisted?
     id.present?
+  end
+
+  def namespace
+    self.class.namespace
+  end
+
+  def namespace=(namespace)
+    self.class.namespace = namespace
   end
 
   ##
@@ -213,10 +223,18 @@ module ActiveModel::Datastore
 
   # Methods defined here will be class methods when 'include ActiveModel::Datastore'.
   module ClassMethods
+    def namespace
+      Namespace.current_namespace
+    end
+
+    def namespace=(namespace)
+      Namespace.current_namespace = namespace
+    end
+
     ##
     # A default parent key for specifying an ancestor path and creating an entity group.
     #
-    def parent_key(parent_id, namespace: nil)
+    def parent_key(parent_id)
       CloudDatastore.dataset.key('Parent' + name, parent_id.to_i, namespace: namespace)
     end
 
@@ -228,7 +246,7 @@ module ActiveModel::Datastore
     #
     # @return [Entity, nil] a Google::Cloud::Datastore::Entity object or nil.
     #
-    def find_entity(id_or_name, parent = nil, namespace = nil)
+    def find_entity(id_or_name, parent = nil)
       key = CloudDatastore.dataset.key name, id_or_name, namespace: namespace
       key.parent = parent if parent.present?
       retry_on_exception { CloudDatastore.dataset.find key }
@@ -250,9 +268,9 @@ module ActiveModel::Datastore
     #
     # @return [Array<Entity>] an array of Google::Cloud::Datastore::Entity objects.
     #
-    def find_entities(*ids_or_names, parent: nil, namespace: nil)
+    def find_entities(*ids_or_names, parent: nil)
       ids_or_names = ids_or_names.flatten.compact.uniq
-      lookup_results = find_all_entities(ids_or_names, parent, namespace)
+      lookup_results = find_all_entities(ids_or_names, parent)
       lookup_results.all.collect { |x| x }
     end
 
@@ -291,7 +309,6 @@ module ActiveModel::Datastore
     #
     def all(options = {})
       next_cursor = nil
-      namespace = options.delete(:namespace)
       query = build_query(options)
       query_results = retry_on_exception { CloudDatastore.dataset.run query, namespace: namespace }
       if options[:limit]
@@ -311,7 +328,7 @@ module ActiveModel::Datastore
     # @return [Model, nil] An ActiveModel object or nil for a single id.
     # @return [Array<Model>] An array of ActiveModel objects for more than one id.
     #
-    def find(*ids, parent: nil, namespace: nil)
+    def find(*ids, parent: nil)
       expects_array = ids.first.is_a?(Array)
       ids = ids.flatten.compact.uniq.map(&:to_i)
 
@@ -319,11 +336,11 @@ module ActiveModel::Datastore
       when 0
         raise EntityError, "Couldn't find #{name} without an ID"
       when 1
-        entity = find_entity(ids.first, parent, namespace)
+        entity = find_entity(ids.first, parent)
         model_entity = from_entity(entity)
         expects_array ? [model_entity].compact : model_entity
       else
-        lookup_results = find_all_entities(ids, parent, namespace)
+        lookup_results = find_all_entities(ids, parent)
         from_entities(lookup_results.all)
       end
     end
@@ -341,7 +358,6 @@ module ActiveModel::Datastore
     #   User.find_by(name: 'Bryce', ancestor: parent_key)
     #
     def find_by(args)
-      namespace = args.delete(:namespace)
       query = CloudDatastore.dataset.query name
       query.ancestor(args[:ancestor]) if args[:ancestor]
       query.limit(1)
@@ -492,7 +508,7 @@ module ActiveModel::Datastore
     # @param [Array<Integer>, Array<String>] ids_or_names An array of ids or names.
     #
     #
-    def find_all_entities(ids_or_names, parent, namespace)
+    def find_all_entities(ids_or_names, parent)
       keys = ids_or_names.map { |id| CloudDatastore.dataset.key name, id, namespace: namespace }
       keys.map { |key| key.parent = parent } if parent.present?
       retry_on_exception { CloudDatastore.dataset.find_all keys }
