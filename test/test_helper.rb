@@ -27,7 +27,6 @@ class MockModel
   attr_accessor :name, :role, :image, :images
   validates :name, presence: true
   enable_change_tracking :name, :role
-  attr_accessor :namespace
 
   def entity_properties
     %w[name role image images]
@@ -82,6 +81,7 @@ class ActiveSupport::TestCase
     FileUtils.rm_rf(CarrierWave::Uploader::Base.root)
     CarrierWave.configure(&:reset_config)
     MockModel.clear_index_exclusions!
+    ActiveModel::Datastore::Namespace.current_namespace = nil
   end
 
   def delete_all_test_entities!
