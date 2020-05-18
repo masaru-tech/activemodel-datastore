@@ -3,7 +3,7 @@ require 'test_helper'
 class CarrierWaveUploaderTest < ActiveSupport::TestCase
   def setup
     super
-    MockModel.send(:extend, CarrierWaveUploader)
+    MockModel.extend CarrierWaveUploader
     MockModel.send(:attr_accessor, :image)
     MockModel.send(:attr_accessor, :images)
     @mock_model = MockModel.new(name: 'A Mock Model')

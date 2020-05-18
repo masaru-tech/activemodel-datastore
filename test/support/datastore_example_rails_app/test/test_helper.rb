@@ -23,9 +23,9 @@ class MockModelParent
 end
 
 # Make the methods within EntityTestExtensions available as class methods.
-MockModel.send :extend, EntityClassMethodExtensions
-MockModelParent.send :extend, EntityClassMethodExtensions
-User.send :extend, EntityClassMethodExtensions
+MockModel.extend EntityClassMethodExtensions
+MockModelParent.extend EntityClassMethodExtensions
+User.extend EntityClassMethodExtensions
 
 class ActiveSupport::TestCase
   include FactoryBot::Syntax::Methods
