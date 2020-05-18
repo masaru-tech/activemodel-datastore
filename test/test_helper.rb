@@ -99,6 +99,7 @@ class ActiveSupport::TestCase
         loop do
           entities = CloudDatastore.dataset.run(query, namespace: ns)
           break if entities.empty?
+
           CloudDatastore.dataset.delete(*entities)
         end
       end
